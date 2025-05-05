@@ -72,14 +72,13 @@ tasks:
 
       - description: Wait for the database deployment to become available
         cmd: kubectl wait --for condition=Available deployments/oracle-db
-        maxTotalSeconds: 600
+        maxRetries: 5
 
       - description: Create the COBOL worker pod
         cmd: kubectl apply -f manifests/worker.yaml
 
       - description: Wait for the COBOL worker pod to complete
         cmd: kubectl wait --for jsonpath='{.status.phase}'=Succeeded pods/cobolite-worker
-        maxTotalSeconds: 600
 
       - description: Print the COBOL worker logs
         cmd: kubectl logs pods/cobolite-worker

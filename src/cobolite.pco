@@ -1,0 +1,293 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. Cobolite.
+       DATE-WRITTEN. 2024.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           CONSOLE IS CON.
+
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT IN-FILE
+               ASSIGN TO "/data/flatfile"
+               ORGANIZATION IS LINE SEQUENTIAL
+               FILE STATUS IS WS-IN-FILE-STATUS.
+           SELECT OUT-FILE
+               ASSIGN TO "/data/flatfile"
+               ORGANIZATION IS LINE SEQUENTIAL
+               FILE STATUS IS WS-OUT-FILE-STATUS.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  IN-FILE
+           LABEL RECORDS ARE STANDARD
+           BLOCK CONTAINS 0
+           RECORD CONTAINS 200 CHARACTERS
+           DATA RECORD IS IN-RECORD.
+
+       01  IN-RECORD.
+           05  IN-DATA  PIC X(200).
+
+       FD  OUT-FILE
+           LABEL RECORDS ARE STANDARD
+           BLOCK CONTAINS 0
+           RECORD CONTAINS 200 CHARACTERS
+           DATA RECORD IS OUT-RECORD.
+
+       01  OUT-RECORD.
+           05  OUT-DATA  PIC X(200).
+
+       WORKING-STORAGE SECTION.
+
+           EXEC SQL
+               INCLUDE SQLCA
+           END-EXEC.
+
+       01  WS-IN-DATA         PIC X(30) VALUE SPACES.
+       01  WS-IN-FILE-STATUS  PIC X(02) VALUE SPACES.
+       01  WS-OUT-FILE-STATUS PIC X(02) VALUE SPACES.
+
+           88  WS-FILE-FOUND       VALUE "00".
+           88  WS-FILE-NOT-FOUND   VALUE "10".
+
+       *> Environment-provided credentials
+       01  ENV-USERNAME       PIC X(50).
+       *> Holds DB username from ENV var "DB_USER".
+       01  ENV-USERNAME-LEN   PIC S9(4).
+       *> Length of the DB username string.
+       01  ENV-PASSWORD       PIC X(50).
+       *> Holds DB password from ENV var "DB_PASS".
+       01  ENV-PASSWORD-LEN   PIC S9(4).
+       *> Length of the DB password string.
+       01  ENV-CONNECT-STR    PIC X(100).
+       *> Holds DB connect string from ENV var "DB_CONN".
+
+       *> Host vars for DB connection (Pro*COBOL VARYING fields)
+       01  WS-DB-CONN.
+           05  USERNAME         PIC X(20) VARYING.
+           05  PASSWORD         PIC X(20) VARYING.
+           05  CONNECT-STRING   PIC X(100).
+
+       *> Host var for the system date
+       01  SYSDATE    PIC X(200).
+       *> Used to hold data retrieved from the SELECT statement.
+
+       *> Status variables for program flow
+       01  WS-STATUS.
+           05  WS-CONNECT-STATUS PIC X(01).
+               88  WS-CONNECTED      VALUE 'Y'.
+               88  WS-NOT-CONNECTED  VALUE 'N'.
+           05  WS-ERROR-STATUS   PIC X(01).
+               88  WS-ERROR         VALUE 'E'.
+               88  WS-NO-ERROR      VALUE 'N'.
+
+       *> Program constants
+       01  WS-CONSTANTS.
+           05  WS-PROG-NAME     PIC X(20) VALUE 'COBOLITE'.
+           05  WS-VERSION       PIC X(10) VALUE 'v0.1.0'.
+
+       *> New Variables to Handle Command-Line Arguments
+       01  WS-CMD-LINE    PIC X(100) VALUE SPACES.
+       01  WS-PROGRAM-ARG     PIC X(10)  VALUE SPACES.
+
+       PROCEDURE DIVISION.
+
+       0000-MAIN-CONTROL.
+           PERFORM 1000-INIT-PROGRAM
+           PERFORM 2000-PROCESS-PROGRAM
+           PERFORM 3000-TERMINATE-PROGRAM
+           .
+       *> The main control flow: init, process, terminate.
+
+       1000-INIT-PROGRAM.
+           DISPLAY WS-PROG-NAME ' ' WS-VERSION
+           DISPLAY 'Program initialization started...'
+           *> Show initial info.
+
+           INITIALIZE WS-STATUS
+           SET WS-NOT-CONNECTED TO TRUE
+           SET WS-NO-ERROR TO TRUE
+           *> Reset statuses at start.
+
+           *> Accept environment variables for DB credentials
+           ACCEPT ENV-USERNAME       FROM ENVIRONMENT "DB_USER"
+           ACCEPT ENV-USERNAME-LEN   FROM ENVIRONMENT "DB_USER_LEN"
+           ACCEPT ENV-PASSWORD       FROM ENVIRONMENT "DB_PASS"
+           ACCEPT ENV-PASSWORD-LEN   FROM ENVIRONMENT "DB_PASS_LEN"
+           ACCEPT ENV-CONNECT-STR    FROM ENVIRONMENT "DB_CONN"
+           *> Values will be blank if ENV not set.
+
+           MOVE ENV-USERNAME       TO USERNAME-ARR
+           MOVE ENV-USERNAME-LEN   TO USERNAME-LEN
+           *> Transfer user & length to Pro*COBOL vars.
+
+           MOVE ENV-PASSWORD       TO PASSWORD-ARR
+           MOVE ENV-PASSWORD-LEN   TO PASSWORD-LEN
+           *> Transfer pass & length to Pro*COBOL vars.
+
+           MOVE ENV-CONNECT-STR    TO CONNECT-STRING
+           *> Transfer connect string (non-VARYING).
+
+           *> Accept Command-Line Argument
+           ACCEPT WS-CMD-LINE FROM COMMAND-LINE
+           *> Retrieve the full command line.
+
+           *> Parse the first argument from the command line.
+           UNSTRING WS-CMD-LINE DELIMITED BY SPACE INTO WS-PROGRAM-ARG
+           *> Extract the first word as the program argument.
+
+           DISPLAY "Received argument: " WS-PROGRAM-ARG
+           .
+       *> Done setting DB connection host variables.
+
+       2000-PROCESS-PROGRAM.
+           PERFORM 2100-CONNECT-DB
+           IF WS-NO-ERROR
+               *> Conditionally perform import or export based on argument
+               IF WS-PROGRAM-ARG = "import"
+                   PERFORM 2200-IMPORT-DATA
+               ELSE IF WS-PROGRAM-ARG = "export"
+                   PERFORM 2300-EXPORT-DATA
+               ELSE
+                   DISPLAY "Invalid argument. Usage: import|export"
+                   SET WS-ERROR TO TRUE
+                   PERFORM 9000-ERROR-ROUTINE
+               END-IF
+           END-IF
+           .
+       *> Main processing flow: connect, do work, disconnect.
+
+       2100-CONNECT-DB.
+           DISPLAY "Attempting database connection..."
+
+           EXEC SQL
+               CONNECT :USERNAME IDENTIFIED BY :PASSWORD
+               USING :CONNECT-STRING
+           END-EXEC
+           *> Perform Oracle DB login.
+
+           IF SQLCODE = 0
+              SET WS-CONNECTED TO TRUE
+              DISPLAY "Database connection successful!"
+           ELSE
+              SET WS-ERROR TO TRUE
+              PERFORM 9000-ERROR-ROUTINE
+           END-IF
+           .
+       *> If SQLCODE != 0 here, login failed.
+
+       2200-IMPORT-DATA.
+           DISPLAY "Checking for input file..."
+           OPEN INPUT IN-FILE
+           IF WS-IN-FILE-STATUS = "10"
+              DISPLAY "Input file not found. Skipping..."
+              CLOSE IN-FILE
+              SET WS-FILE-NOT-FOUND TO TRUE
+              EXIT PARAGRAPH
+           END-IF
+
+           SET WS-FILE-FOUND TO TRUE
+           READ IN-FILE INTO WS-IN-DATA
+           IF WS-IN-FILE-STATUS = "00"
+              DISPLAY "Read data from file: " WS-IN-DATA
+              DISPLAY "Importing data to the database..."
+              EXEC SQL
+                  INSERT INTO EXAMPLE.TABLE (INPUT)
+                  VALUES (:WS-IN-DATA)
+              END-EXEC
+              IF SQLCODE = 0
+                 DISPLAY "Data successfully imported into the database."
+              ELSE
+                 IF SQLCODE = -942
+                    *> -942 = ORA-00942 (table not found).
+                    DISPLAY "Table EXAMPLE.TABLE does not exist!"
+                    DISPLAY "No data imported."
+                    *> We do not treat this as fatal.
+                 ELSE
+                    SET WS-ERROR TO TRUE
+                    PERFORM 9000-ERROR-ROUTINE
+                    *> All other errors are handled normally.
+                 END-IF
+              END-IF
+           ELSE
+              DISPLAY "Error reading input file. Skipping..."
+           END-IF
+           CLOSE IN-FILE
+           .
+
+       2300-EXPORT-DATA.
+           DISPLAY "Exporting data from the database..."
+
+           EXEC SQL
+               SELECT SYSDATE
+                 INTO :SYSDATE
+                 FROM DUAL
+                WHERE ROWNUM = 1
+           END-EXEC
+
+           IF SQLCODE = 0
+              DISPLAY "SYSDATE: " SYSDATE
+           ELSE
+              IF SQLCODE = -942
+                 *> -942 = ORA-00942 (table not found).
+                 DISPLAY "Table DUAL does not exist!"
+                 DISPLAY "Writing 'TESTDATA' instead..."
+                 MOVE "TESTDATA" TO SYSDATE
+              ELSE
+                 SET WS-ERROR TO TRUE
+                 PERFORM 9000-ERROR-ROUTINE
+              END-IF
+           END-IF
+
+           DISPLAY "Creating output file..."
+           OPEN OUTPUT OUT-FILE
+           MOVE SYSDATE TO OUT-DATA
+           WRITE OUT-RECORD
+           CLOSE OUT-FILE
+           DISPLAY "Wrote data to /data/flatfile"
+           .
+
+       2400-DISCONNECT-DB.
+           DISPLAY "Disconnecting from database..."
+
+           EXEC SQL
+               COMMIT WORK RELEASE
+           END-EXEC
+           *> Oracle command: commit any changes, release connection.
+
+           IF SQLCODE = 0
+              SET WS-NOT-CONNECTED TO TRUE
+              DISPLAY "Database disconnection successful"
+           ELSE
+              SET WS-ERROR TO TRUE
+              PERFORM 9000-ERROR-ROUTINE
+           END-IF
+           .
+
+       3000-TERMINATE-PROGRAM.
+           DISPLAY "Program termination started..."
+
+           IF WS-CONNECTED
+              PERFORM 2400-DISCONNECT-DB
+           END-IF
+
+           DISPLAY WS-PROG-NAME " completed"
+           DISPLAY "Status: "
+           IF WS-NO-ERROR
+              DISPLAY "  Successful execution"
+              STOP RUN
+           ELSE
+              DISPLAY "  Completed with errors"
+              STOP RUN 1
+           END-IF
+           .
+
+       9000-ERROR-ROUTINE.
+           DISPLAY "ERROR DETECTED:"
+           DISPLAY "SQLCODE: " SQLCODE
+           DISPLAY "SQLERRM: " SQLERRMC
+
+           SET WS-ERROR TO TRUE
+           .

@@ -1,0 +1,23 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cobolite-worker
+  namespace: default
+spec:
+  containers:
+    - name: cobolite-worker
+      image: cobolite:latest-amd64
+      args: ["export"]
+      env:
+        - name: DB_USER
+          value: "SYSTEM"
+        - name: DB_USER_LEN
+          value: "6"
+        - name: DB_PASS
+          value: "password"
+        - name: DB_PASS_LEN
+          value: "8"
+        - name: DB_CONN
+          value: "//oracle-db:1521/FREEPDB1"
+  restartPolicy: OnFailure

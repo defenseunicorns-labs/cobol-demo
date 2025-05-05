@@ -1,0 +1,85 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/defenseunicorns/maru-runner/refs/tags/v0.6.0/tasks.schema.json
+tasks:
+  - name: default
+    description: List available tasks
+    actions:
+      - cmd: maru run --list
+
+  - name: dev
+    description: The full development workflow
+    actions:
+      - task: preflight
+      - task: keygen
+      - task: build-pkg
+      - task: build-img
+      - task: deploy
+
+  - name: preflight
+    description: Ensure all required CLI tools are installed
+    actions:
+      - cmd: |
+          missing_tools=()
+          for tool in melange apko k3d kubectl; do
+            if ! command -v "$tool" &> /dev/null; then
+              missing_tools+=("$tool")
+            fi
+          done
+
+          if [ ${#missing_tools[@]} -eq 0 ]; then
+            echo "✅ All required CLI tools are installed."
+            exit 0
+          else
+            echo "⚠️ Missing required CLI tools: ${missing_tools[*]}"
+            echo "Please install the missing tools and try again."
+            exit 1
+          fi
+
+  - name: keygen
+    description: Generate the necessary keys for melange
+    actions:
+      - cmd: melange keygen src/melange.rsa
+
+  - name: build-pkg
+    description: Build the melange package with dependencies
+    actions:
+      - cmd: melange build src/package.yaml --signing-key=src/melange.rsa --pipeline-dir=src/pipelines/ --source-dir=src/ --out-dir=dist/
+
+  - name: build-img
+    description: Build the container image with apko
+    actions:
+      - cmd: apko build src/container.yaml cobolite dist/cobolite.tar --keyring-append=src/melange.rsa.pub --sbom=false --repository-append=dist/
+
+  - name: deploy
+    description: Deploy the container image to a local k3d Kubernetes cluster
+    actions:
+      - description: Validation check to see if the k3d test cluster is running
+        cmd: |
+          k3d cluster list -o json | jq '.[0].name | contains("cobolite")'
+        setVariables:
+          - name: TEST_CLUSTER_UP
+
+      - if: ${{ eq .variables.TEST_CLUSTER_UP "true" }}
+        cmd: echo "Test cluster appears to be running"
+
+      - if: ${{ eq .variables.TEST_CLUSTER_UP "false" }}
+        cmd: k3d cluster create cobolite
+
+      - description: Load the container image into k3d
+        cmd: k3d image import dist/cobolite.tar --cluster cobolite
+
+      - description: Create the database deployment
+        cmd: kubectl apply -f manifests/database.yaml
+
+      - description: Wait for the database deployment to become available
+        cmd: kubectl wait --for condition=Available deployments/oracle-db
+        maxTotalSeconds: 600
+
+      - description: Create the COBOL worker pod
+        cmd: kubectl apply -f manifests/worker.yaml
+
+      - description: Wait for the COBOL worker pod to complete
+        cmd: kubectl wait --for jsonpath='{.status.phase}'=Succeeded pods/cobolite-worker
+        maxTotalSeconds: 600
+
+      - description: Print the COBOL worker logs
+        cmd: kubectl logs pods/cobolite-worker

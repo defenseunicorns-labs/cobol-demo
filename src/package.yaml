@@ -1,0 +1,23 @@
+package:
+  name: cobolite
+  version: 0.1.0
+  epoch: 0
+  description: "A simple, example Pro*COBOL program"
+  copyright:
+    - license: Apache-2.0
+  target-architecture:
+    - x86_64
+  dependencies:
+    runtime:
+      - gnucobol
+      - libaio
+
+environment:
+  contents:
+    repositories:
+      - https://packages.wolfi.dev/os
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+
+pipeline:
+  - uses: procob

@@ -1,0 +1,30 @@
+# melange files
+*.rsa*
+*.apk
+*.sig
+*.tar.gz
+*.buildinfo
+*.log
+/melange-cache/
+/tmp/
+/output/
+melange.rsa
+melange.rsa.pub
+packages/
+
+# apko files
+*.tar
+*.oci
+/output/*.tar
+*.cdx
+*.spdx*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Oracle Libraries
+src/libs/*.zip
+
+# output files
+dist/

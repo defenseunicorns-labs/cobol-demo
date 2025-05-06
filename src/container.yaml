@@ -1,0 +1,28 @@
+contents:
+  repositories:
+    - https://packages.wolfi.dev/os
+  keyring:
+    - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+  packages:
+    - cobolite
+
+entrypoint:
+  command: /usr/bin/main
+
+archs:
+  - x86_64
+
+accounts:
+  groups:
+    - groupname: user
+      gid: 10000
+  users:
+    - username: user
+      uid: 10000
+
+paths:
+  - path: /usr/bin/main
+    type: permissions
+    uid: 10000
+    gid: 10000
+    permissions: 0o755

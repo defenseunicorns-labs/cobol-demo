@@ -1,0 +1,45 @@
+name: Install an executable from Pro*COBOL source code
+
+needs:
+  packages:
+    - build-base
+    - busybox
+    - libaio
+    - gcc
+    - gnucobol
+    - coreutils
+    - gmp-dev
+
+pipeline:
+  - runs: |
+      # Extract the program name
+      PROGRAM_NAME=$(basename "${{package.name}}" .pco)
+
+      # Install Oracle Instant Client bundles
+      mkdir -p /opt/oracle
+      unzip "${{package.srcdir}}/libs/instantclient-precomp-linux.x64-19.25.0.0.0dbru.zip" -d /opt/oracle/
+      unzip -o "${{package.srcdir}}/libs/instantclient-basic-linux.x64-19.25.0.0.0dbru.zip" -d /opt/oracle/
+
+      # Link supporting libraries
+      echo "/opt/oracle/instantclient_19_25" >> /etc/ld.so.conf
+      ldconfig
+
+      # Add procob to the $PATH and pre-compile the program
+      export PATH=/opt/oracle/instantclient_19_25/sdk:$PATH
+      procob $PROGRAM_NAME.pco INCLUDE=/opt/cobol
+
+      # Compile the resultant COBOL program
+      cobc -x -std=mf -o $PROGRAM_NAME $PROGRAM_NAME.cob \
+        /opt/oracle/instantclient_19_25/cobsqlintf.o \
+        /opt/oracle/instantclient_19_25/libclntsh.so \
+        -L/usr/local/lib -L/usr/include/ -lcob -L/opt/oracle/instantclient_19_25 -lclntsh
+
+      # Create target directories
+      mkdir -p "${{targets.contextdir}}/usr/bin"
+      mkdir -p "${{targets.contextdir}}/usr/lib"
+
+      # Install the binary
+      install -Dm755 "$PROGRAM_NAME" "${{targets.contextdir}}/usr/bin/main"
+
+      # Bundle Oracle Instant Client libraries
+      cp /opt/oracle/instantclient_19_25/*.so* "${{targets.contextdir}}/usr/lib/"

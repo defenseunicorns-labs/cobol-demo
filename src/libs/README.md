@@ -2,11 +2,11 @@
 
 Due to Oracle licensing restrictions, we cannot include the Oracle Instant Client files directly with this project. You will need to download these files yourself:
 
-1. Visit the Oracle Instant Client download page: https://www.oracle.com/database/technologies/instant-client/downloads.html
-2. Navigate to the Linux x64 downloads section
-3. Download the following two files (you'll need to create an Oracle account if you don't have one):
-   - `instantclient-basic-linux.x64-19.25.0.0.0dbru.zip`
-   - `instantclient-precomp-linux.x64-19.25.0.0.0dbru.zip`
-4. Place these files in this directory
+1. Download the Basic package:
+   - Direct link: https://download.oracle.com/otn_software/linux/instantclient/1927000/instantclient-basic-linux.x64-19.27.0.0.0dbru.zip
+2. Download the Precompiler package (requires Oracle Account and license agreement acceptance):
+   - Direct link: https://www.oracle.com/webapps/redirect/signon?nexturl=https://download.oracle.com/otn_software/linux/instantclient/1927000/instantclient-precomp-linux.x64-19.27.0.0.0dbru.zip
+   - This requires acceptance of the [Oracle License Agreement](https://www.oracle.com/technetwork/licenses/standard-license-152015.html#licenseContent) and an Oracle Account (which is free to create)
+3. Place these files in this directory
 
 Note: Version numbers may change over time. If the exact versions listed are not available, download the latest versions and update your configuration accordingly.

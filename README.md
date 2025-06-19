@@ -18,14 +18,16 @@ This project demonstrates how to containerize and run a Pro*COBOL application wi
 
 ### Oracle Instant Client Files
 
-Due to Oracle licensing restrictions, you need to download these files yourself:
+Due to Oracle licensing restrictions, you need to download the Oracle Instant Client files yourself. See the detailed instructions in [`src/libs/README.md`](src/libs/README.md) for:
 
-1. Visit the [Oracle Instant Client download page](https://www.oracle.com/database/technologies/instant-client/downloads.html)
-2. Navigate to the Linux x64 downloads section
-3. Download the following (you'll need an Oracle account):
-   - `instantclient-basic-linux.x64-19.25.0.0.0dbru.zip`
-   - `instantclient-precomp-linux.x64-19.25.0.0.0dbru.zip`
-4. Place these files in the `src/libs/` directory
+- Direct download links for the required packages
+- Oracle account and license agreement requirements
+- Specific version information and compatibility notes
+- Proper placement of the downloaded files
+
+The required files are:
+- `instantclient-basic-linux.x64-19.27.0.0.0dbru.zip`
+- `instantclient-precomp-linux.x64-19.27.0.0.0dbru.zip`
 
 ## Project Structure
 
